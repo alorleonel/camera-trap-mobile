@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CameraTrap">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="data:application/json,{{"name":"Camera Trap","short_name":"CameraTrap","start_url":"./","display":"standalone","background_color":"#0d1117","theme_color":"#0d1117"}}">
+<title>Camera Trap</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;height:100dvh;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100dvh}
+#nav{display:flex;background:#161b22;border-top:1px solid #30363d;flex-shrink:0;order:2;padding-bottom:env(safe-area-inset-bottom)}
+.nav-btn{flex:1;padding:10px 4px 8px;background:none;border:none;color:#8b949e;font-size:10px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.nav-btn.active{color:#3fb950}
+.nav-btn svg,.nav-btn .ni{width:22px;height:22px;fill:currentColor;font-size:22px;line-height:1}
+.page{flex:1;overflow:hidden;display:none;flex-direction:column;order:1}
+.page.active{display:flex}
+#map{flex:1;min-height:0}
+.page-hdr{background:#161b22;border-bottom:1px solid #30363d;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.page-hdr h2{font-size:15px;font-weight:600}
+#project-bar{background:#0d1117;border-bottom:1px solid #30363d;padding:6px 10px;display:flex;align-items:center;gap:6px;flex-shrink:0}
+#project-bar select{flex:1;background:#1c2128;border:1px solid #30363d;border-radius:5px;padding:6px 8px;color:#e6edf3;font-size:13px;-webkit-appearance:none}
+#sync-bar{font-size:10px;color:#8b949e;text-align:center;padding:3px 8px;background:#0d1117;flex-shrink:0}
+/* Records */
+#records-list{flex:1;overflow-y:auto;padding:8px;-webkit-overflow-scrolling:touch}
+.rec{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:11px 12px;margin-bottom:7px}
+.rec-title{font-size:14px;font-weight:600;margin-bottom:2px}
+.rec-sub{font-size:11px;color:#8b949e}
+.badge{display:inline-block;background:#21262d;border-radius:4px;padding:1px 6px;font-size:10px;color:#58a6ff;margin-left:4px}
+/* Add form */
+#add-page{overflow-y:auto;-webkit-overflow-scrolling:touch}
+.form-body{padding:14px;display:flex;flex-direction:column;gap:11px}
+.fl label{display:block;font-size:10px;color:#8b949e;margin-bottom:4px;letter-spacing:.4px;text-transform:uppercase}
+.fl input,.fl select,.fl textarea{width:100%;background:#1c2128;border:1px solid #30363d;border-radius:6px;padding:10px 11px;color:#e6edf3;font-size:14px;outline:none;-webkit-appearance:none;font-family:inherit}
+.fl input:focus,.fl select:focus{border-color:#58a6ff;background:#161b22}
+.fl textarea{height:65px;resize:none}
+.row2{display:flex;gap:8px}.row2 .fl{flex:1}
+.btn-p{background:#238636;border:none;color:#fff;padding:14px;border-radius:8px;font-size:15px;font-weight:600;width:100%;cursor:pointer;margin-top:4px}
+.btn-p:active{background:#2ea043}
+.btn-s{background:#1c2128;border:1px solid #30363d;color:#e6edf3;padding:9px 12px;border-radius:7px;font-size:13px;cursor:pointer;width:100%}
+/* Charts */
+#chart-scroll{flex:1;overflow-y:auto;padding:10px;-webkit-overflow-scrolling:touch}
+.chart-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:11px;margin-bottom:10px}
+.chart-card h3{font-size:11px;color:#58a6ff;margin-bottom:7px;text-transform:uppercase;letter-spacing:.4px}
+.chart-card canvas{max-height:170px}
+/* Stat pills */
+.stats-row{display:flex;gap:8px;margin-bottom:10px}
+.stat{flex:1;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 8px;text-align:center}
+.stat-n{font-size:22px;font-weight:700;color:#3fb950}
+.stat-l{font-size:10px;color:#8b949e;margin-top:2px}
+/* Toast */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#238636;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:9999;display:none;white-space:nowrap}
+/* Popup */
+.leaflet-popup-content-wrapper{background:#161b22!important;border:1px solid #30363d!important;color:#e6edf3!important;border-radius:8px!important}
+.leaflet-popup-tip{background:#161b22!important}
+/* Map controls */
+.map-layer-btn{position:absolute;top:10px;right:10px;z-index:1000;background:rgba(22,27,34,.9);border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:6px 10px;font-size:12px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="project-bar">
+    <span style="color:#8b949e;font-size:11px;white-space:nowrap">📁</span>
+    <select id="proj-sel" onchange="loadProject(this.value)"><option value="">— select project —</option></select>
+    <button class="btn-s" style="width:auto;padding:6px 10px" onclick="fetchProjects()">↻</button>
+  </div>
+  <div id="sync-bar">Not synced · tap ↻ to load projects</div>
+
+  <!-- Map -->
+  <div class="page active" id="map-page">
+    <div id="map" style="flex:1">
+      <button class="map-layer-btn" id="layer-btn" onclick="toggleLayer()">🛰 Sat</button>
+    </div>
+  </div>
+
+  <!-- Records -->
+  <div class="page" id="records-page">
+    <div class="page-hdr">
+      <h2>Records</h2>
+      <input id="rec-q" placeholder="🔍 Search…" style="background:#1c2128;border:1px solid #30363d;border-radius:6px;padding:7px 10px;color:#e6edf3;font-size:13px;width:130px" oninput="renderRecords()">
+    </div>
+    <div id="records-list"><p style="color:#8b949e;text-align:center;padding:40px">Load a project first</p></div>
+  </div>
+
+  <!-- Add Record -->
+  <div class="page" id="add-page">
+    <div class="page-hdr"><h2>➕ Add Record</h2></div>
+    <div class="form-body">
+      <div class="fl"><label>Detection Type</label>
+        <select id="f-type" onchange="onTypeChange()">
+          <option>Camera Trap</option><option>Direct Sighting</option><option>Track</option>
+          <option>Dead Animal</option><option>Scat</option><option>Burrow / Den</option><option>Audio</option><option>Other</option>
+        </select>
+      </div>
+      <div class="fl"><label>Species</label>
+        <input id="f-sp" list="sp-list" placeholder="Wolf, Caracal…" autocomplete="off">
+        <datalist id="sp-list"></datalist>
+      </div>
+      <div class="fl" id="cam-row"><label>Camera</label>
+        <select id="f-cam"></select>
+      </div>
+      <div id="loc-rows" style="display:none">
+        <div class="row2">
+          <div class="fl"><label>Latitude</label><input id="f-lat" placeholder="31.7683" inputmode="decimal"></div>
+          <div class="fl"><label>Longitude</label><input id="f-lon" placeholder="35.2137" inputmode="decimal"></div>
+        </div>
+        <button class="btn-s" style="margin-top:6px" onclick="useGPS()">📍 Use My GPS Location</button>
+      </div>
+      <div class="row2">
+        <div class="fl"><label>Date &amp; Time</label><input id="f-ts" type="datetime-local"></div>
+        <div class="fl"><label>Count</label><input id="f-cnt" type="number" min="1" value="1" inputmode="numeric"></div>
+      </div>
+      <div class="row2">
+        <div class="fl"><label>Individual</label><input id="f-ind" placeholder="Name / ID"></div>
+        <div class="fl"><label>Sex</label>
+          <select id="f-sex"><option>Unknown</option><option>Male</option><option>Female</option><option>Juvenile</option></select>
+        </div>
+      </div>
+      <div class="fl"><label>Behaviour</label><input id="f-beh" placeholder="Running, foraging…"></div>
+      <div class="fl"><label>Notes</label><textarea id="f-notes" placeholder="Conditions, observations…"></textarea></div>
+      <button class="btn-p" onclick="saveRecord()">💾 Save Record</button>
+      <div id="save-msg" style="text-align:center;font-size:13px;min-height:18px"></div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="page" id="charts-page">
+    <div class="page-hdr"><h2>📊 Analysis</h2></div>
+    <div id="chart-scroll">
+      <div class="stats-row">
+        <div class="stat"><div class="stat-n" id="s-recs">—</div><div class="stat-l">Records</div></div>
+        <div class="stat"><div class="stat-n" id="s-sp">—</div><div class="stat-l">Species</div></div>
+        <div class="stat"><div class="stat-n" id="s-cams">—</div><div class="stat-l">Cameras</div></div>
+      </div>
+      <div class="chart-card"><h3>By Species</h3><canvas id="c-sp"></canvas></div>
+      <div class="chart-card"><h3>By Camera</h3><canvas id="c-cam"></canvas></div>
+      <div class="chart-card"><h3>Activity by Hour</h3><canvas id="c-hr"></canvas></div>
+      <div class="chart-card"><h3>By Month</h3><canvas id="c-mo"></canvas></div>
+    </div>
+  </div>
+
+  <nav id="nav">
+    <button class="nav-btn active" onclick="nav('map-page',this)"><span class="ni">🗺</span>Map</button>
+    <button class="nav-btn" onclick="nav('records-page',this)"><span class="ni">📋</span>Records</button>
+    <button class="nav-btn" onclick="nav('add-page',this);initAdd()"><span class="ni">➕</span>Add</button>
+    <button class="nav-btn" onclick="nav('charts-page',this);renderCharts()"><span class="ni">📊</span>Charts</button>
+  </nav>
+</div>
+<div id="toast"></div>
+
+<script>
+const SB_URL="https://dlofjyfakiuycaleggmo.supabase.co",SB_KEY="sb_publishable_m5918Ei8oxtPNDkN7KLzsw_XOVMJet2";
+let DB={cameras:{},detections:[],camera_groups:{},species_history:[],custom_icons:{}};
+let currentProject="",map,camGroup,detGroup,curTile="sat";
+const charts={};
+
+// ── Supabase ──────────────────────────────────────────────────────────
+async function sb(path,method="GET",body=null){
+  const r=await fetch(SB_URL+"/rest/v1/"+path,{method,
+    headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,
+      "Content-Type":"application/json",
+      "Prefer":method==="POST"?"resolution=merge-duplicates,return=minimal":""},
+    body:body?JSON.stringify(body):undefined});
+  if(!r.ok) throw new Error(await r.text());
+  const t=await r.text(); return t?JSON.parse(t):[];
+}
+
+async function fetchProjects(){
+  setStat("Loading projects…");
+  try{
+    const rows=await sb("ct_projects?select=id,name,updated_at&order=updated_at.desc");
+    const sel=document.getElementById("proj-sel");
+    sel.innerHTML='<option value="">— select project —</option>';
+    rows.forEach(r=>{const o=document.createElement("option");o.value=r.id;
+      o.textContent=r.name+" ("+( r.updated_at||"").slice(0,10)+")";sel.appendChild(o);});
+    setStat(rows.length+" project(s) — tap to load");
+    // Auto-load if only one
+    if(rows.length===1){sel.value=rows[0].id;loadProject(rows[0].id);}
+  }catch(e){setStat("Error: "+e.message);}
+}
+
+async function loadProject(id){
+  if(!id)return; currentProject=id; setStat("Loading…");
+  try{
+    const rows=await sb("ct_projects?id=eq."+encodeURIComponent(id)+"&select=data,updated_at");
+    if(!rows.length){setStat("Not found — push from desktop first.");return;}
+    const d=rows[0].data;
+    DB={cameras:d.cameras||{},detections:d.detections||[],
+         camera_groups:d.camera_groups||{},species_history:d.species_history||[],
+         custom_icons:d.custom_icons||{}};
+    renderMap(); renderRecords(); populateAdd();
+    const upd=(rows[0].updated_at||"").slice(0,16);
+    setStat("✓ "+DB.detections.length+" records · synced "+upd);
+  }catch(e){setStat("Error: "+e.message);}
+}
+
+async function pushUp(){
+  if(!currentProject)return;
+  await sb("ct_projects","POST",{id:currentProject,name:currentProject,
+    data:DB,updated_at:new Date().toISOString()});
+}
+
+function setStat(m){document.getElementById("sync-bar").textContent=m;}
+function toast(m,ms=2200){const t=document.getElementById("toast");t.textContent=m;t.style.display="block";setTimeout(()=>t.style.display="none",ms);}
+
+// ── Nav ───────────────────────────────────────────────────────────────
+function nav(id,btn){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  if(btn)btn.classList.add("active");
+  if(id==="map-page")setTimeout(()=>map&&map.invalidateSize(),120);
+}
+
+// ── Map ───────────────────────────────────────────────────────────────
+const TILES={
+  sat:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  osm:"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+};
+let tileLayer;
+function initMap(){
+  map=L.map("map",{preferCanvas:true,zoomControl:true}).setView([31.77,35.21],10);
+  tileLayer=L.tileLayer(TILES.sat,{attribution:"Esri",maxZoom:19}).addTo(map);
+  camGroup=L.layerGroup().addTo(map);
+  detGroup=L.markerClusterGroup({maxClusterRadius:50,disableClusteringAtZoom:15,
+    showCoverageOnHover:false,
+    iconCreateFunction:function(c){
+      return L.divIcon({html:"<div style='background:rgba(255,107,53,.85);color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff'>"+c.getChildCount()+"</div>",iconSize:[30,30],className:""});}}).addTo(map);
+}
+
+function toggleLayer(){
+  curTile=curTile==="sat"?"osm":"sat";
+  tileLayer.setUrl(TILES[curTile]);
+  document.getElementById("layer-btn").textContent=curTile==="sat"?"🛰 Sat":"🗺 Map";
+}
+
+const ICONS={"wolf":"🐺","caracal":"🐈","leopard cat":"🐈","leopard":"🐆","fox":"🦊","red fox":"🦊","jackal":"🦊","hyena":"🦡","striped hyena":"🦡","porcupine":"🦔","crested porcupine":"🦔","hare":"🐇","ibex":"🐐","nubian ibex":"🐐","gazelle":"🦌","dorcas gazelle":"🦌","bird":"🐦","owl":"🦉","barn owl":"🦉","tawny owl":"🦉","lynx":"🐈‍⬛","eurasian lynx":"🐈‍⬛","tiger":"🐯","bear":"🐻","badger":"🦡","honey badger":"🦡","rodent":"🐀","lizard":"🦎","monitor":"🦎","snake":"🐍","boar":"🐗","wild boar":"🐗","deer":"🦌","roe deer":"🦌","red deer":"🦌","elk":"🦌","moose":"🫎","wolf":"🐺","grey wolf":"🐺","mongoose":"🦡","marten":"🦡","yellow-throated marten":"🦡","cat":"🐈","wildcat":"🐈","serval":"🐈","cheetah":"🐆","coyote":"🦊","raccoon":"🦝","otter":"🦦","weasel":"🦡"};
+function ico(sp){return ICONS[(sp||"").toLowerCase()]||"📷";}
+
+function renderMap(){
+  camGroup.clearLayers(); detGroup.clearLayers();
+  Object.values(DB.cameras||{}).forEach(cam=>{
+    if(!cam.lat)return;
+    const icon=L.divIcon({className:"",iconSize:[22,22],iconAnchor:[11,11],
+      html:"<div style='width:22px;height:22px;background:"+(cam.color||"#4ECDC4")+";border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px'>📷</div>"});
+    L.marker([cam.lat,cam.lon],{icon})
+      .bindPopup("<b>"+cam.name+"</b>"+(cam.deployed?"<br><small>Deployed: "+cam.deployed+"</small>":""))
+      .addTo(camGroup);
+  });
+  const markers=[];
+  (DB.detections||[]).forEach(d=>{
+    if(d.polygon&&d.polygon.length>1)return;
+    const cam=(DB.cameras||{})[d.camera_id];
+    const lat=d.lat!=null?d.lat:(cam?cam.lat:null);
+    const lon=d.lon!=null?d.lon:(cam?cam.lon:null);
+    if(lat==null||lon==null)return;
+    const e=ico(d.species);
+    const icon=L.divIcon({className:"",iconSize:[30,30],iconAnchor:[15,15],
+      html:"<div style='font-size:24px;filter:drop-shadow(0 0 2px #000)'>"+e+"</div>"});
+    markers.push(L.marker([lat,lon],{icon})
+      .bindPopup("<b>"+e+" "+(d.species||"?")+"</b>"+(d.individual?" · "+d.individual:"")
+        +(d.behaviour?"<br><small>"+d.behaviour+"</small>":"")
+        +"<br><small style='color:#8b949e'>"+(cam?cam.name:"")+" · "+(d.timestamp||"").slice(0,16)+"</small>"
+        +(d.notes?"<br><small style='color:#58a6ff'>"+d.notes.slice(0,80)+"</small>":"")));
+  });
+  if(markers.length)detGroup.addLayers(markers);
+  const pts=Object.values(DB.cameras||{}).filter(c=>c.lat);
+  if(pts.length)map.setView([pts[0].lat,pts[0].lon],12);
+}
+
+// ── Records ───────────────────────────────────────────────────────────
+function renderRecords(){
+  const q=(document.getElementById("rec-q").value||"").toLowerCase();
+  const list=document.getElementById("records-list");
+  const cams=DB.cameras||{};
+  const dets=(DB.detections||[])
+    .filter(d=>!q||[d.species,d.individual,d.notes,(cams[d.camera_id]||{}).name].some(v=>(v||"").toLowerCase().includes(q)))
+    .sort((a,b)=>(b.timestamp||"").localeCompare(a.timestamp||""))
+    .slice(0,300);
+  if(!dets.length){list.innerHTML='<p style="color:#8b949e;text-align:center;padding:40px">'+(DB.detections.length?"No matches":"Load a project first")+'</p>';return;}
+  list.innerHTML=dets.map(d=>{
+    const cam=cams[d.camera_id];
+    const e=ico(d.species);
+    const dtype=d.detection_type&&d.detection_type!=="Camera Trap"?'<span class="badge">'+d.detection_type+'</span>':"";;
+    return '<div class="rec"><div class="rec-title">'+e+' <b>'+(d.species||"Unknown")+'</b>'+(d.individual?' · <span style="color:#8b949e">'+(d.individual)+'</span>':"")+dtype+'</div>'
+      +'<div class="rec-sub">'+(cam?cam.name:"📍 "+((d.lat||0).toFixed(3)+","+(d.lon||0).toFixed(3)))+' · '+(d.timestamp||"").slice(0,16)+'</div>'
+      +(d.notes?'<div class="rec-sub" style="margin-top:3px;color:#58a6ff">'+d.notes.slice(0,70)+'</div>':"")
+      +'</div>';
+  }).join("");
+}
+
+// ── Add Record ────────────────────────────────────────────────────────
+function populateAdd(){
+  const sel=document.getElementById("f-cam");
+  sel.innerHTML=Object.entries(DB.cameras||{}).map(([id,c])=>'<option value="'+id+'">'+c.name+'</option>').join("");
+  const dl=document.getElementById("sp-list");
+  dl.innerHTML=(DB.species_history||[]).map(s=>'<option value="'+s+'">').join("");
+}
+
+function initAdd(){
+  const now=new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
+  document.getElementById("f-ts").value=now.toISOString().slice(0,16);
+  ["f-sp","f-ind","f-beh","f-notes"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("f-cnt").value="1";
+  document.getElementById("f-sex").value="Unknown";
+  document.getElementById("save-msg").textContent="";
+  onTypeChange();
+}
+
+function onTypeChange(){
+  const t=document.getElementById("f-type").value;
+  document.getElementById("cam-row").style.display=t==="Camera Trap"?"":"none";
+  document.getElementById("loc-rows").style.display=t!=="Camera Trap"?"":"none";
+}
+
+function useGPS(){
+  if(!navigator.geolocation){toast("GPS not available");return;}
+  navigator.geolocation.getCurrentPosition(
+    p=>{document.getElementById("f-lat").value=p.coords.latitude.toFixed(6);
+         document.getElementById("f-lon").value=p.coords.longitude.toFixed(6);
+         toast("📍 Location set");},
+    ()=>toast("Could not get location"));
+}
+
+async function saveRecord(){
+  const sp=document.getElementById("f-sp").value.trim();
+  if(!sp){toast("Enter a species");return;}
+  if(!currentProject){toast("Load a project first");return;}
+  const dtype=document.getElementById("f-type").value;
+  const rawTs=document.getElementById("f-ts").value;
+  const ts=rawTs?rawTs.replace("T"," ")+":00":"";
+  const cam_id=dtype==="Camera Trap"?document.getElementById("f-cam").value:"";
+  const det_lat=dtype!=="Camera Trap"?(parseFloat(document.getElementById("f-lat").value)||null):null;
+  const det_lon=dtype!=="Camera Trap"?(parseFloat(document.getElementById("f-lon").value)||null):null;
+  const det={
+    id:"det_"+Date.now()+"_mobile",
+    camera_id:cam_id,lat:det_lat,lon:det_lon,
+    detection_type:dtype,timestamp:ts,
+    species:sp,individual:document.getElementById("f-ind").value.trim(),
+    sex:document.getElementById("f-sex").value,
+    count:parseInt(document.getElementById("f-cnt").value)||1,
+    behaviour:document.getElementById("f-beh").value.trim(),
+    notes:document.getElementById("f-notes").value.trim(),
+    filename:"",filepath:"",polygon:[],is_polygon:false,
+  };
+  if(!DB.species_history.includes(sp))DB.species_history.push(sp);
+  DB.detections.push(det);
+  document.getElementById("save-msg").textContent="⏳ Saving…";
+  document.getElementById("save-msg").style.color="#8b949e";
+  try{
+    await pushUp();
+    document.getElementById("save-msg").textContent="✅ Saved & synced!";
+    document.getElementById("save-msg").style.color="#3fb950";
+    renderRecords(); renderMap();
+    setStat("✓ "+DB.detections.length+" records · just synced");
+    // Reset species field for quick successive entry
+    document.getElementById("f-sp").value="";
+    document.getElementById("f-notes").value="";
+  }catch(e){
+    // Still saved locally — note that
+    document.getElementById("save-msg").textContent="⚠ Saved locally, sync failed: "+e.message;
+    document.getElementById("save-msg").style.color="#F7DC6F";
+  }
+}
+
+// ── Charts ────────────────────────────────────────────────────────────
+function renderCharts(){
+  const dets=DB.detections||[],cams=DB.cameras||{};
+  document.getElementById("s-recs").textContent=dets.length;
+  document.getElementById("s-sp").textContent=new Set(dets.map(d=>d.species)).size;
+  document.getElementById("s-cams").textContent=Object.keys(cams).length;
+  const C=["#FF6B35","#4ECDC4","#45B7D1","#96CEB4","#F7DC6F","#DDA0DD","#82E0AA","#F1948A"];
+  const baseOpts={responsive:true,animation:{duration:0},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:"#161b22",titleColor:"#e6edf3",bodyColor:"#8b949e"}},
+    scales:{x:{ticks:{color:"#8b949e",font:{size:9}},grid:{color:"#21262d"}},
+             y:{ticks:{color:"#8b949e",font:{size:9}},grid:{color:"#21262d"},beginAtZero:true}}};
+  function mk(id,type,labels,data,colors){
+    if(charts[id])charts[id].destroy();
+    charts[id]=new Chart(document.getElementById(id),{type,
+      data:{labels,datasets:[{data,backgroundColor:colors||C[0],borderRadius:3,borderWidth:0}]},
+      options:{...baseOpts,plugins:{...baseOpts.plugins,legend:{display:type==="doughnut"}},
+               scales:type==="doughnut"?{}:baseOpts.scales}});
+  }
+  const spC={};dets.forEach(d=>spC[d.species||"?"]=(spC[d.species||"?"]||0)+1);
+  const sp=Object.entries(spC).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  mk("c-sp","bar",sp.map(x=>x[0]),sp.map(x=>x[1]),C);
+  const camC={};dets.forEach(d=>{const n=(cams[d.camera_id]||{}).name||"?";camC[n]=(camC[n]||0)+1;});
+  const cam=Object.entries(camC).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  mk("c-cam","bar",cam.map(x=>x[0]),cam.map(x=>x[1]),C);
+  const hrs=new Array(24).fill(0);
+  dets.forEach(d=>{try{hrs[parseInt((d.timestamp||"").slice(11,13))]++;}catch(e){}});
+  mk("c-hr","bar",Array.from({length:24},(_,i)=>i+":00"),hrs,
+    hrs.map((_,h)=>h>=20||h<6?"#1a3a6b":"#F7DC6F"));
+  const mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const mc=new Array(12).fill(0);
+  dets.forEach(d=>{try{mc[parseInt((d.timestamp||"").slice(5,7))-1]++;}catch(e){}});
+  mk("c-mo","bar",mo,mc,C);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+initMap();
+fetchProjects();
+</script>
+</body>
+</html>
